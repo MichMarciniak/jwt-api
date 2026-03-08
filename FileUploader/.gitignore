@@ -1,0 +1,18 @@
+# .net
+bin/
+obj/
+bin*
+
+#sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# user settings
+appsettings.Development.json
+.vs/
+.idea/
+*.user
+*.suo
+
+
