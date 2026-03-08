@@ -7,10 +7,16 @@ namespace FileUploader.Controllers.Config;
 [ApiController]
 public class ResultControllerBase : ControllerBase
 {
-    protected IActionResult ProcessResult<T>(Result<T> result)
+    protected IActionResult HandleError<T>(Result<T> result)
     {
         if (result.IsSuccess) return Ok(result.Value);
         
-        return StatusCode(result.Error.StatusCode, result.Error);
+        var error = result.Error;
+
+        return Problem(
+            title: error.Code,
+            detail: error.Message,
+            statusCode: error.StatusCode
+        );
     }
 }

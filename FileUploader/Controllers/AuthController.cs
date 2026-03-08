@@ -12,10 +12,11 @@ public class AuthController : ResultControllerBase
     private readonly UserService _userService;
     private readonly AuthService _authService;
     
-    public AuthController(ILogger<UserController> logger, UserService userService)
+    public AuthController(ILogger<UserController> logger, UserService userService, AuthService authService)
     {
         _logger = logger;
         _userService = userService;
+        _authService = authService;
     }
 
     [HttpPost("register")]
@@ -32,7 +33,7 @@ public class AuthController : ResultControllerBase
 
         if (!result.IsSuccess)
         {
-            return ProcessResult(result);
+            return HandleError(result);
         }
         
         var user = result.Value!; // ! to force not null
