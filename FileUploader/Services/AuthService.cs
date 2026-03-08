@@ -1,7 +1,11 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using FileUploader.Data;
+using FileUploader.Entities;
 using Konscious.Security.Cryptography;
+using Microsoft.IdentityModel.Tokens;
 
 namespace FileUploader.Services;
 
@@ -10,6 +14,12 @@ public class AuthService
     private const int Degree = 8;
     private const int Iterations = 4;
     private const int MemorySize = 65536;
+    private readonly  IConfiguration _config;
+
+    public AuthService(IConfiguration config)
+    {
+        _config = config;
+    }
     
     // could've used sth higher-level :/ 
     public string HashPassword(string password)
@@ -48,4 +58,30 @@ public class AuthService
         
         return CryptographicOperations.FixedTimeEquals(hash, newHash);
     }
+
+    public string GenerateAccessToken(User user)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Name)
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT_KEY"]));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _config["JWT_ISSUER"],
+            audience: _config["JWT_AUDIENCE"],
+            claims: claims,
+            expires: DateTime.Now.AddMinutes(int.Parse(_config["JWT_ACCESS_MINUTES"])),
+            signingCredentials: creds
+        );
+        
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }
+
+
+
+

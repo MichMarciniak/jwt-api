@@ -1,3 +1,4 @@
+using FileUploader.Common;
 using FileUploader.Data;
 using FileUploader.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -35,12 +36,15 @@ public class UserService
         return true;
     }
 
-    public async Task<bool> LoginAsync(string username, string password)
+    public async Task<Result<User>> LoginAsync(string username, string password)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == username);
-        if (user == null) return false;
+        if (user == null || !_authService.VerifyPassword(password, user.Password))
+        {
+            return Result<User>.Failure(Error.InvalidCredentials);
+        }
         
-        return _authService.VerifyPassword(password, user.Password);
+        return Result<User>.Success(user);
     }
     
 }
