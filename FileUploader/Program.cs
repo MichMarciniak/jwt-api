@@ -1,5 +1,4 @@
 using FileUploader.Data;
-using FileUploader.Entities;
 using FileUploader.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +14,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // scoped - one instance per request
 builder.Services.AddScoped<FileService>();
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AuthService>();
 
 var app = builder.Build();
 
