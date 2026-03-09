@@ -80,6 +80,28 @@ public class AuthService
         
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public string GenerateRefreshToken(User user)
+    {
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Name, user.Name),
+        };
+        
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT_KEY"]));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _config["JWT_ISSUER"],
+            audience: _config["JWT_AUDIENCE"],
+            claims: claims,
+            expires: DateTime.Now.AddDays(int.Parse(_config["JWT_REFRESH_DAYS"])),
+            signingCredentials: creds
+        );
+        return new JwtSecurityTokenHandler().WriteToken(token);
+
+    }
 }
 
 

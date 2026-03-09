@@ -14,7 +14,7 @@ public class AuthController : ResultControllerBase
     private readonly UserService _userService;
     private readonly AuthService _authService;
 
-    private void SetCookies(string accessToken)
+    private void SetCookies(string accessToken, string refreshToken)
     {
         var cookieOptions = new CookieOptions
         {
@@ -24,6 +24,7 @@ public class AuthController : ResultControllerBase
             Expires = DateTime.Now.AddMinutes(15)
         };
         Response.Cookies.Append("access-token",  accessToken, cookieOptions);
+        Response.Cookies.Append("refresh-token",  refreshToken, cookieOptions);
         
     }
     
@@ -54,8 +55,9 @@ public class AuthController : ResultControllerBase
         var user = result.Value!; // ! to force not null
         
         var accessToken = _authService.GenerateAccessToken(user);
+        var refreshToken = _authService.GenerateRefreshToken(user);
 
-        SetCookies(accessToken);
+        SetCookies(accessToken, refreshToken);
 
         return Ok();
     }
