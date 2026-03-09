@@ -15,6 +15,7 @@ public class UserConfig : IEntityTypeConfiguration<User>
        
        b.Property(x => x.Name).IsRequired().HasMaxLength(100);
        b.Property(x => x.Password).IsRequired();
+       b.Property(x => x.TokenVersion).IsRequired().HasDefaultValue(1);
 
        b.HasMany(x => x.Files)
            .WithOne(x => x.User)
