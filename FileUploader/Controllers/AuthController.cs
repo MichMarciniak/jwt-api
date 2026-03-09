@@ -1,8 +1,10 @@
 using FileUploader.Controllers.Config;
 using FileUploader.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using LoginRequest = FileUploader.DTOs.LoginRequest;
 using RegisterRequest = FileUploader.DTOs.RegisterRequest;
+using SameSiteMode = Microsoft.AspNetCore.Http.SameSiteMode;
 
 namespace FileUploader.Controllers;
 [ApiController]
@@ -11,6 +13,19 @@ public class AuthController : ResultControllerBase
     private readonly ILogger<UserController> _logger;
     private readonly UserService _userService;
     private readonly AuthService _authService;
+
+    private void SetCookies(string accessToken)
+    {
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.Now.AddMinutes(15)
+        };
+        Response.Cookies.Append("access-token",  accessToken, cookieOptions);
+        
+    }
     
     public AuthController(ILogger<UserController> logger, UserService userService, AuthService authService)
     {
@@ -40,6 +55,8 @@ public class AuthController : ResultControllerBase
         
         var accessToken = _authService.GenerateAccessToken(user);
 
-        return Ok(accessToken);
+        SetCookies(accessToken);
+
+        return Ok();
     }
 }
