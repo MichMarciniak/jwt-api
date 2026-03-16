@@ -1,5 +1,19 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace FileUploader.DTOs;
 
-public record LoginRequest(string Username, string Password);
 
-public record RegisterRequest(string Username, string Password);
+public static class AuthDto
+{
+    public record Login(string Username, string Password);
+    public record Register(
+        [Required] [MaxLength(100)] string Username,
+        [Required] string Password
+    );
+
+    public record Tokens(
+        string AccessToken,
+        string RefreshToken
+    );
+
+}

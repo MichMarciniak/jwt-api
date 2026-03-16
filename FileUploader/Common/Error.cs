@@ -13,5 +13,7 @@ public record Error(string Code, string Message, int StatusCode)
     public static readonly Error UserAlreadyExists = 
         new("Auth.UserAlreadyExists", "User already exists", 409);
     
+    public static readonly Error InvalidToken = 
+        new("Auth.InvalidToken", "Invalid token", 401);
     
 }

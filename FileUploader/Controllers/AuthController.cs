@@ -1,9 +1,8 @@
 using FileUploader.Controllers.Config;
+using FileUploader.DTOs;
 using FileUploader.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
-using LoginRequest = FileUploader.DTOs.LoginRequest;
-using RegisterRequest = FileUploader.DTOs.RegisterRequest;
 using SameSiteMode = Microsoft.AspNetCore.Http.SameSiteMode;
 
 namespace FileUploader.Controllers;
@@ -12,38 +11,25 @@ public class AuthController : ResultControllerBase
 {
     private readonly ILogger<UserController> _logger;
     private readonly UserService _userService;
-    private readonly AuthService _authService;
+    private readonly TokenService _tokenService;
 
-    private void SetCookies(string accessToken, string refreshToken)
-    {
-        var cookieOptions = new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Lax,
-            Expires = DateTime.Now.AddMinutes(15)
-        };
-        Response.Cookies.Append("access-token",  accessToken, cookieOptions);
-        Response.Cookies.Append("refresh-token",  refreshToken, cookieOptions);
-        
-    }
-    
-    public AuthController(ILogger<UserController> logger, UserService userService, AuthService authService)
+    public AuthController(ILogger<UserController> logger, UserService userService, TokenService tokenService)
     {
         _logger = logger;
         _userService = userService;
-        _authService = authService;
+        _tokenService = tokenService;
     }
-
+    
+    
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] AuthDto.Register request)
     {
-        var success = await _userService.RegisterAsync(request.Username, request.Password);
-        return success ? Ok() : BadRequest();
+        var result = await _userService.RegisterAsync(request.Username, request.Password);
+        return result.IsSuccess ? Ok() : HandleError(result);
     }
     
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromForm] LoginRequest request)
+    public async Task<IActionResult> Login([FromForm] AuthDto.Login request)
     {
         var result = await _userService.LoginAsync(request.Username, request.Password);
 
@@ -54,11 +40,52 @@ public class AuthController : ResultControllerBase
         
         var user = result.Value!; // ! to force not null
         
-        var accessToken = _authService.GenerateAccessToken(user);
-        var refreshToken = _authService.GenerateRefreshToken(user);
+        var accessToken = _tokenService.GenerateAccessToken(user);
+        var refreshToken = _tokenService.GenerateRefreshToken(user);
 
         SetCookies(accessToken, refreshToken);
 
         return Ok();
     }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken()
+    {
+        var refreshToken = Request.Cookies["refresh-token"];
+
+        if (string.IsNullOrEmpty(refreshToken)) return Unauthorized();
+
+        var result = await _tokenService.RefreshToken(refreshToken);
+        
+        if (!result.IsSuccess) return HandleError(result);
+
+        var tokens = result.Value!;
+        
+        SetCookies(tokens.AccessToken, tokens.RefreshToken);
+
+        return Ok();
+    }
+    
+    
+    
+    /* Helpers ------------- */
+    private void SetCookies(string accessToken, string refreshToken)
+    {
+        Response.Cookies.Append("access-token",  accessToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.Now.AddMinutes(15)
+        });
+        Response.Cookies.Append("refresh-token",  refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.Now.AddDays(7)
+        });
+        
+    }
+    
 }

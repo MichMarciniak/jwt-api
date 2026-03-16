@@ -7,5 +7,5 @@ public record Result<T>(
     )
 {
     public static Result<T> Success(T value) => new(value, true, Error.None);
-    public static Result<T> Failure(Error error, int statusCode = 400) => new (default, false, error);
+    public static Result<T> Failure(Error error) => new (default, false, error);
 }
