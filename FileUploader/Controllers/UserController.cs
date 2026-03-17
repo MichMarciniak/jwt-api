@@ -1,4 +1,5 @@
 using FileUploader.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FileUploader.Controllers;
@@ -9,5 +10,11 @@ public class UserController : ControllerBase
 {
     private readonly ILogger<UserController> _logger;
     private readonly UserService _userService;
-    
+
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Get()
+    {
+        return Ok();
+    }
 }

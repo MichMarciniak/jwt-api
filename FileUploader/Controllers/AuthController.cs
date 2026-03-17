@@ -65,9 +65,7 @@ public class AuthController : ResultControllerBase
 
         return Ok();
     }
-    
-    
-    
+
     /* Helpers ------------- */
     private void SetCookies(string accessToken, string refreshToken)
     {

@@ -1,12 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using FileUploader.Config;
 using FileUploader.Data;
 using FileUploader.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 DotNetEnv.Env.Load();
 
@@ -17,7 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddControllers();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddOpenApi();
+  
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -28,6 +28,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = JwtConfig.GetValidationParameters(builder.Configuration);
+        options.Events = JwtConfig.GetJwtBearerEvents();
     });
     
     
@@ -41,8 +42,11 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.MapOpenApi();
+    app.UseSwaggerUI(opt =>
+    {
+        opt.SwaggerEndpoint("/openapi/v1.json", "FileUploader API v1");
+    });
 }
 // app.UseHttpsRedirection();
 app.UseAuthentication();

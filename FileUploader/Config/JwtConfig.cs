@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FileUploader.Config;
@@ -17,6 +18,18 @@ public class JwtConfig
             ValidAudience = config["JWT_AUDIENCE"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(config["JWT_KEY"]))
+        };
+    }
+
+    public static JwtBearerEvents GetJwtBearerEvents()
+    {
+        return new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                context.Token = context.Request.Cookies["access-token"];
+                return Task.CompletedTask;
+            }
         };
     }
 }
