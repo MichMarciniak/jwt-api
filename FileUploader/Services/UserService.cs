@@ -2,7 +2,10 @@ using System.Security.Cryptography;
 using System.Text;
 using FileUploader.Common;
 using FileUploader.Data;
+using FileUploader.DTOs;
 using FileUploader.Entities;
+using FileUploader.Services.PasswordHasher;
+using FileUploader.Settings;
 using Konscious.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,17 +15,14 @@ public class UserService
 {
     private readonly AppDbContext _context;
     private readonly TokenService _tokenService;
-    
-    private const int Degree = 8;
-    private const int Iterations = 4;
-    private const int MemorySize = 65536;
-    private readonly  IConfiguration _config;
-    
-    public UserService(AppDbContext context,  TokenService tokenService, IConfiguration config)
+    private readonly IPasswordHasher _hasher;
+
+
+    public UserService(AppDbContext context,  TokenService tokenService, IPasswordHasher hasher)
     {
         _context = context;
         _tokenService = tokenService;
-        _config = config;
+        _hasher = hasher;
     }
 
     public async Task<Result<bool>> RegisterAsync(string username, string password)
@@ -32,8 +32,8 @@ public class UserService
             return Result<bool>.Failure(Error.UserAlreadyExists);
         }
 
-        var passwordHash = HashPassword(password);
-        // later validate password
+        var passwordHash = _hasher.Hash(password);
+        // no validation for now for ease
 
         var user = new User
         {
@@ -46,58 +46,20 @@ public class UserService
         return Result<bool>.Success(true);
     }
 
-    public async Task<Result<User>> LoginAsync(string username, string password)
+    public async Task<Result<AuthDto.AuthResponse>> LoginAsync(string username, string password)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == username);
-        if (user == null || !VerifyPassword(password, user.Password))
+        if (user == null || !_hasher.Verify(password, user.Password))
         {
-            return Result<User>.Failure(Error.InvalidCredentials);
+            return Result<AuthDto.AuthResponse>.Failure(Error.InvalidCredentials);
         }
+        var response = new AuthDto.AuthResponse(user.Id, user.Name, user.TokenVersion);
         
-        return Result<User>.Success(user);
+        return Result<AuthDto.AuthResponse>.Success(response);
     }
 
     public async Task<Result<bool>> FullLogout()
     {
         return Result<bool>.Success(true);
-    }
-
-    
-    /* HELPERS ----------------- */ 
-    private string HashPassword(string password)
-    {
-        var salt = new byte[16];
-        RandomNumberGenerator.Fill(salt);
-
-        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
-        {
-            Salt = salt,
-            DegreeOfParallelism = Degree,
-            Iterations = Iterations,
-            MemorySize = MemorySize
-        };
-
-        var hash = argon2.GetBytes(32);
-
-        return $"{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
-    }
-
-    private bool VerifyPassword(string password, string fullHash)
-    {
-        var parts = fullHash.Split(':');
-        var salt = Convert.FromBase64String(parts[0]);
-        var hash = Convert.FromBase64String(parts[1]);
-
-        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
-        {
-            Salt = salt,
-            DegreeOfParallelism = Degree,
-            Iterations = Iterations,
-            MemorySize = MemorySize
-        };
-
-        var newHash = argon2.GetBytes(32);
-        
-        return CryptographicOperations.FixedTimeEquals(hash, newHash);
     }
 }

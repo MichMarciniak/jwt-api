@@ -1,6 +1,7 @@
 using FileUploader.Controllers.Config;
 using FileUploader.DTOs;
 using FileUploader.Services;
+using FileUploader.Settings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using SameSiteMode = Microsoft.AspNetCore.Http.SameSiteMode;
@@ -12,12 +13,14 @@ public class AuthController : ResultControllerBase
     private readonly ILogger<UserController> _logger;
     private readonly UserService _userService;
     private readonly TokenService _tokenService;
+    private readonly JwtSettings _jwtSettings;
 
-    public AuthController(ILogger<UserController> logger, UserService userService, TokenService tokenService)
+    public AuthController(ILogger<UserController> logger, UserService userService, TokenService tokenService, JwtSettings jwtSettings)
     {
         _logger = logger;
         _userService = userService;
         _tokenService = tokenService;
+        _jwtSettings = jwtSettings;
     }
     
     
@@ -29,22 +32,14 @@ public class AuthController : ResultControllerBase
     }
     
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromForm] AuthDto.Login request)
+    public async Task<IActionResult> Login([FromBody] AuthDto.Login request)
     {
         var result = await _userService.LoginAsync(request.Username, request.Password);
+        if (!result.IsSuccess) return HandleError(result);
 
-        if (!result.IsSuccess)
-        {
-            return HandleError(result);
-        }
-        
-        var user = result.Value!; // ! to force not null
-        
-        var accessToken = _tokenService.GenerateAccessToken(user);
-        var refreshToken = _tokenService.GenerateRefreshToken(user);
+        var tokens = _tokenService.GenerateTokens(result.Value!);
 
-        SetCookies(accessToken, refreshToken);
-
+        SetCookies(tokens.AccessToken, tokens.RefreshToken);
         return Ok();
     }
 
@@ -52,11 +47,9 @@ public class AuthController : ResultControllerBase
     public async Task<IActionResult> RefreshToken()
     {
         var refreshToken = Request.Cookies["refresh-token"];
-
         if (string.IsNullOrEmpty(refreshToken)) return Unauthorized();
 
         var result = await _tokenService.RefreshToken(refreshToken);
-        
         if (!result.IsSuccess) return HandleError(result);
 
         var tokens = result.Value!;
@@ -74,14 +67,14 @@ public class AuthController : ResultControllerBase
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Lax,
-            Expires = DateTime.Now.AddMinutes(15)
+            Expires = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessMinutes)
         });
         Response.Cookies.Append("refresh-token",  refreshToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Lax,
-            Expires = DateTime.Now.AddDays(7)
+            Expires = DateTime.UtcNow.AddDays(_jwtSettings.RefreshDays)
         });
         
     }

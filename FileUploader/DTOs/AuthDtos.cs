@@ -16,4 +16,6 @@ public static class AuthDto
         string RefreshToken
     );
 
+    public record AuthResponse(int UserId, string Username, int Version);
+
 }

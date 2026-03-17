@@ -1,79 +1,36 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using FileUploader.Common;
 using FileUploader.Config;
 using FileUploader.Data;
 using FileUploader.DTOs;
-using FileUploader.Entities;
-using Microsoft.IdentityModel.Tokens;
+using FileUploader.Services.Tokens;
+using FileUploader.Settings;
 
 namespace FileUploader.Services;
 
 public class TokenService
 {
-    private IConfiguration _config;
     private AppDbContext _context;
+    private readonly JwtSettings _settings;
+    private readonly TokenGenerator _generator;
 
-    public TokenService(IConfiguration config, AppDbContext context)
+    public TokenService(JwtSettings settings, AppDbContext context, TokenGenerator generator)
     {
-        _config = config;
+        _settings = settings;
         _context = context;
+        _generator = generator;
     }
 
-    public string GenerateAccessToken(User user)
+    public AuthDto.Tokens GenerateTokens(AuthDto.AuthResponse user)
     {
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Name, user.Name)
-        };
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT_KEY"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: _config["JWT_ISSUER"],
-            audience: _config["JWT_AUDIENCE"],
-            claims: claims,
-            expires: DateTime.Now.AddMinutes(int.Parse(_config["JWT_ACCESS_MINUTES"]!)),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return _generator.GenerateTokens(user);
     }
 
-    public string GenerateRefreshToken(User user)
-    {
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Name, user.Name),
-            new Claim("v", user.TokenVersion.ToString()),
-        };
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT_KEY"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: _config["JWT_ISSUER"],
-            audience: _config["JWT_AUDIENCE"],
-            claims: claims,
-            expires: DateTime.Now.AddDays(int.Parse(_config["JWT_REFRESH_DAYS"]!)),
-            signingCredentials: creds
-        );
-        return new JwtSecurityTokenHandler().WriteToken(token);
-
-    }
-
-    //this is just for refresh, normal auth happens automatically
-    public ClaimsPrincipal? GetPrincipalFromToken(string token)
+    private ClaimsPrincipal? GetPrincipalFromToken(string token)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
-        var parameters = JwtConfig.GetValidationParameters(_config);
-
-        // ignore exp date so i can refresh
-        parameters.ValidateLifetime = false;
+        var parameters = JwtConfig.GetValidationParameters(_settings);
 
         try
         {
@@ -90,6 +47,12 @@ public class TokenService
         var principal = GetPrincipalFromToken(refreshToken);
         if (principal == null)
             return Result<AuthDto.Tokens>.Failure(Error.InvalidToken);
+
+        var typeClaim = principal.FindFirstValue("typ");
+        if (typeClaim != "refresh")
+        {
+            return Result<AuthDto.Tokens>.Failure(Error.InvalidToken);
+        }
         
         var userId = int.Parse(principal.FindFirstValue(JwtRegisteredClaimNames.Sub)!);
         var versionInToken = int.Parse(principal.FindFirstValue("v") ?? "0");
@@ -100,12 +63,11 @@ public class TokenService
             return Result<AuthDto.Tokens>.Failure(Error.InvalidToken);
         }
 
-        var newAccess = GenerateAccessToken(user);
-        var newRefresh = GenerateRefreshToken(user);
-        var tokens = new AuthDto.Tokens(newAccess, newRefresh);
+        var authUser = new AuthDto.AuthResponse(user.Id, user.Name, user.TokenVersion);
+
+        var tokens = _generator.GenerateTokens(authUser);
 
         return Result<AuthDto.Tokens>.Success(tokens);
-
     }
 
 }
