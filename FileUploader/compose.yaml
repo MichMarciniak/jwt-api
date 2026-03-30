@@ -1,7 +1,0 @@
-﻿services:
-  fileuploader:
-    image: fileuploader
-    build:
-      context: .
-      dockerfile: Dockerfile
-
